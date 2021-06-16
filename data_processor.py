@@ -68,7 +68,7 @@ class BaseProcessor(object):
 
         for (ex_idx, example) in enumerate(examples):
             if ex_idx % 10000 == 0:
-                tf.logging.info("Writing examples %d of %d." % (ex_idx, len(examples)))
+                tf.logging.debug("Writing examples %d of %d." % (ex_idx, len(examples)))
 
             feature = self.convert_single_example(ex_idx, example, tokenizer, label2id_map)
             if feature is None:
@@ -178,14 +178,14 @@ class BaseProcessor(object):
                 raise ValueError("Unsupported task type")
 
         if ex_idx < 3:
-            tf.logging.info("*** Example ***")
-            tf.logging.info("tokens: %s" % " ".join(
+            tf.logging.debug("*** Example ***")
+            tf.logging.debug("tokens: %s" % " ".join(
                 [tokenization.printable_text(x) for x in tokenizer.convert_ids_to_tokens(input_ids)]))
-            tf.logging.info("input_ids: %s" % " ".join([str(x) for x in input_ids]))
-            tf.logging.info("actual length: %s" % length)
+            tf.logging.debug("input_ids: %s" % " ".join([str(x) for x in input_ids]))
+            tf.logging.debug("actual length: %s" % length)
             if labels is not None:
-                tf.logging.info("labels: %s" % " ".join(labels))
-                tf.logging.info("label_ids: %s" % " ".join([str(x) for x in label_ids]))
+                tf.logging.debug("labels: %s" % " ".join(labels))
+                tf.logging.debug("label_ids: %s" % " ".join([str(x) for x in label_ids]))
 
         feature = BaseFeature(
             input_ids=input_ids,

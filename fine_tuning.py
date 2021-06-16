@@ -43,6 +43,8 @@ tf.flags.DEFINE_string("current_task", None, "Current task")
 
 tf.flags.DEFINE_string("log_level", "info", "The level of logs")
 
+tf.flags.DEFINE_string("gpu_id", "", "GPU ID")
+
 # hyper parameter
 
 tf.flags.DEFINE_integer("ex_idx", 0, "The experiment idx")
@@ -53,28 +55,26 @@ tf.flags.DEFINE_integer("train_batch_size", 64, "The batch size of train")
 
 tf.flags.DEFINE_float("learning_rate", None, "Learning rate of train")
 
-tf.flags.DEFINE_string("fine_tuning_layers", None, "Which layers to fine tuning")
-
-tf.flags.DEFINE_string("gather_method", "last", "Gather method")
+tf.flags.DEFINE_integer("fine_tuning_layers", None, "Which layers to fine tuning")
 
 
 def main(_):
     log_level = FLAGS.log_level
     tf.logging.set_verbosity(log_level.upper())
-    tf.logging.info(tf.logging.get_verbosity())
+    tf.logging.debug(tf.logging.get_verbosity())
+    os.environ["CUDA_VISIBLE_DEVICES"] = FLAGS.gpu_id
 
     # Load task config
     available_tasks = FLAGS.available_tasks.split(",")
     task_config = FLAGS.task_config
     all_tasks = centra_bert_core.load_available_task(
         available_tasks=available_tasks,
-        task_config=task_config,
-        gather_method=FLAGS.gather_method
+        task_config=task_config
     )
     current_task = FLAGS.current_task
     if current_task in all_tasks:
-        tf.logging.info("Available tasks: %s, current task: %s"
-                        % (" ".join(all_tasks.keys()), current_task))
+        tf.logging.debug("Available tasks: %s, current task: %s"
+                         % (" ".join(all_tasks.keys()), current_task))
     else:
         raise ValueError("Current task: %s, is not in the available tasks: %s"
                          % (current_task, " ".join(all_tasks.keys())))
@@ -94,7 +94,7 @@ def main(_):
     output_dir = os.path.join(
         FLAGS.output_dir,
         current_task,
-        "fine-tuning-%s" % FLAGS.fine_tuning_layers,
+        "Lr-%s-Layers-%s" % (FLAGS.learning_rate, FLAGS.fine_tuning_layers),
         "ex-%s" % FLAGS.ex_idx
     )
     tf.gfile.MakeDirs(output_dir)
