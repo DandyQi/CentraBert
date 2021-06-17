@@ -135,7 +135,7 @@ def model_fn_builder(bert_config, init_checkpoint, tasks, max_seq_length,
                 )
                 custom_checkpoint_utils.init_from_checkpoint(student_init_checkpoint, student_init_assignment_map)
 
-        tf.logging.info("**** All Variables ****")
+        tf.logging.debug("**** All Variables ****")
         for var in tvars:
             init_string = ""
             update_string = ""
@@ -146,8 +146,8 @@ def model_fn_builder(bert_config, init_checkpoint, tasks, max_seq_length,
                 update_string = ", *UPDATE_FROM_CKPT*"
             if var.name in student_variable_names:
                 stu_string = ", *STU_INIT*"
-            tf.logging.info("  name = %s, shape = %s%s%s%s",
-                            var.name, var.shape, init_string, update_string, stu_string)
+            tf.logging.debug("  name = %s, shape = %s%s%s%s",
+                             var.name, var.shape, init_string, update_string, stu_string)
 
         if mode == tf.estimator.ModeKeys.TRAIN:
             assert current_task is not None

@@ -79,9 +79,9 @@ def create_optimizer(loss, init_lr, num_train_steps, num_warmup_steps, current_t
     else:
         tvars = [tvar for tvar in tvars if tvar.name.split("/")[0] == current_task_name]
 
-    tf.logging.info("**** Trainable Variables ****")
+    tf.logging.debug("**** Trainable Variables ****")
     for var in tvars:
-        tf.logging.info("  name = %s, shape = %s", var.name, var.shape)
+        tf.logging.debug("  name = %s, shape = %s", var.name, var.shape)
 
     gvs = optimizer.compute_gradients(loss, tvars)
     gvs = [(g, v) for g, v in gvs if g is not None]

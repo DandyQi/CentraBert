@@ -262,7 +262,7 @@ class BaseTask(object):
 
         label_set = set()
         for fin in self.input_files:
-            tf.logging.info("Reading input from %s for label stats" % fin)
+            tf.logging.debug("Reading input from %s for label stats" % fin)
             with tf.gfile.GFile(fin, "r") as f:
                 for line in f.readlines():
                     line = line.strip()
@@ -286,7 +286,7 @@ class BaseTask(object):
             labels.remove("O")
             labels.insert(0, "O")
 
-        tf.logging.info("Labels: %s, stats in %s" % (" ".join(labels), " ".join(self.input_files)))
+        tf.logging.debug("Labels: %s, stats in %s" % (" ".join(labels), " ".join(self.input_files)))
 
         return labels
 
