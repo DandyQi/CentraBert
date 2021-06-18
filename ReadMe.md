@@ -11,10 +11,10 @@ conda create -n centra-bert --file requirements.txt python=3.6
 conda activate centra-bert
 ```
 
-## Get started
+## Get Started
 
 There are 3 steps to get a multi-task model with CentraBert:
-1. Fine tuning
+1. Fine tune
 2. Distill (Optional)
 3. Merge
 
@@ -41,7 +41,7 @@ output_method = cls
 is_eng = True
 ```
 
-### Fine tuning
+### Fine Tune
 
 Different tasks may have different optimal fine-tuning layers, so you can use the following script `shell/fine_tuning.sh` to select the best fine-tuning layers.
 ```bash
@@ -214,3 +214,153 @@ python merge_branch.py \
     --input_file=${input_file}
 ```
 The checkpoint in the latest task directory contains trained parameter for all tasks.
+
+## Advanced
+
+### Update Model
+#### Delete a task branch from a merged model.
+
+For example, you have a merged model which contains mrpc, rte, mnli and qnli. You can use the following script to delete a task from this model, such as rte:
+```bash
+#!/usr/bin/env bash
+
+# General param
+bert_config_file=conf/uncased_bert_base/bert_config.json
+vocab_file=conf/uncased_bert_base/vocab.txt
+output_dir=model/glue/gather
+init_checkpoint=somewhere/merged_model/model.ckpt
+task_config=conf/glue_task_config.cfg
+branch_config=conf/branch.cfg
+gather_from_student=True
+gpu_id=3
+input_file=data/glue/tmp_input_file.txt
+
+# The original task list contains four tasks, now remains three.
+# available_tasks=mrpc,rte,mnli,qnli
+available_tasks=mrpc,mnli,qnli
+
+python update.py \
+    --bert_config_file=${bert_config_file} \
+    --vocab_file=${vocab_file} \
+    --output_dir=${output_dir} \
+    --init_checkpoint=${init_checkpoint} \
+    --task_config=${task_config} \
+    --branch_config=${branch_config} \
+    --available_tasks=${available_tasks} \
+    --gather_from_student=${gather_from_student} \
+    --gpu_id=${gpu_id} \
+    --input_file=${input_file}
+``` 
+
+#### Add a new task branch into a merged model.
+
+For example, you have a merged model which contains mrpc, rte. You can use the following scripts to add a new task into this model, such as mnli:
+```bash
+#!/usr/bin/env bash
+
+# General param
+bert_config_file=conf/uncased_bert_base/bert_config.json
+vocab_file=conf/uncased_bert_base/vocab.txt
+output_dir=model/glue/gather
+init_checkpoint=somewhere/merged_model/model.ckpt
+task_config=conf/glue_task_config.cfg
+branch_config=conf/branch.cfg # A new branch config which contains mnli's fine tuning layers
+gather_from_student=True
+gpu_id=3
+input_file=data/glue/tmp_input_file.txt
+
+# Current tasks, add the new task mnli
+available_tasks=mrpc,rte,mnli
+
+# new task info
+update_checkpoint=somewhere/mnli/model.ckpt
+update_scope=mnli
+
+
+python update.py \
+    --bert_config_file=${bert_config_file} \
+    --vocab_file=${vocab_file} \
+    --output_dir=${output_dir} \
+    --init_checkpoint=${init_checkpoint} \
+    --update_checkpoint=${update_checkpoint} \
+    --update_scope=${update_scope} \
+    --task_config=${task_config} \
+    --branch_config=${branch_config} \
+    --available_tasks=${available_tasks} \
+    --gather_from_student=${gather_from_student} \
+    --gpu_id=${gpu_id} \
+    --input_file=${input_file}
+```
+
+#### Update an exist task in a merged model.
+
+For example, you have a merged model which contains mrpc, rte. You can use the following scripts to update an exist task branch in this model, such as rte:
+```bash
+#!/usr/bin/env bash
+
+# General param
+bert_config_file=conf/uncased_bert_base/bert_config.json
+vocab_file=conf/uncased_bert_base/vocab.txt
+output_dir=model/glue/gather
+init_checkpoint=somewhere/merged_model/model.ckpt
+task_config=conf/glue_task_config.cfg
+branch_config=conf/branch.cfg # A new branch config if you change rte's fine tuning layers
+gather_from_student=True
+gpu_id=3
+input_file=data/glue/tmp_input_file.txt
+
+# Current tasks
+available_tasks=mrpc,rte
+
+# new task info
+update_checkpoint=somewhere/new-rte/model.ckpt
+update_scope=rte
+
+
+python update.py \
+    --bert_config_file=${bert_config_file} \
+    --vocab_file=${vocab_file} \
+    --output_dir=${output_dir} \
+    --init_checkpoint=${init_checkpoint} \
+    --update_checkpoint=${update_checkpoint} \
+    --update_scope=${update_scope} \
+    --task_config=${task_config} \
+    --branch_config=${branch_config} \
+    --available_tasks=${available_tasks} \
+    --gather_from_student=${gather_from_student} \
+    --gpu_id=${gpu_id} \
+    --input_file=${input_file}
+```
+
+#### How does it work?
+The merged model is generated in the following three steps:
+1. Build the graph which contains a freeze part and several fine-tuned parts according to the `layer_conf` in `branch_config` 
+2. Load parameters from `init_checkpoint` to initialize the original model
+3. Load parameters with specific scope `update_scope` from `update_checkpoint` to initialize the new task branch or reinitialize the exist task branch.
+
+### Result Analysis
+You can use the following scripts to analysis model performance among several training procedures.
+```bash
+output_dir=model/glue/teacher
+task=mrpc
+learning_rate=2e-5,1e-4
+fine_tuning_layers=6,8
+exam_num=3
+
+# key_param=fine_tuning_layers
+key_param=learning_rate
+
+python result_summary.py \
+    --job=plot \
+    --key_param=${key_param} \
+    --output_dir=${output_dir} \
+    --task=${task} \
+    --learning_rate=${learning_rate} \
+    --fine_tuning_layers=${fine_tuning_layers} \
+    --exam_num=${exam_num} \
+    --dev=True \
+    --version=teacher
+```
+![avatar](docs/metrics_analysis_lr.png)
+
+![avatar](docs/metrics_analysis_layers.png)
