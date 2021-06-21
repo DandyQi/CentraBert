@@ -1,39 +1,52 @@
 # CentraBert
 
-CentraBert is an out-of-the-box framework for solving NLU tasks based on BERT.
-
+We present an efficient BERT-based multi-task (MT) framework that is particularly suitable for iterative and incremental development of the tasks. 
+Unlike in conventional Multi-Task Learning where the tasks are coupled due to joint training, 
+in our framework the tasks are independent of each other and can be updated on a per-task basis.
+One key advantage our framework provides is that the owner of one task do not need to coordinate with other task owners in order to update the model for that task, 
+and any modification made to that task does not interfere with the rest of the tasks.
 
 ## Installation
 
-It's recommended to install all the packages you need in an virtual environment
+We recommend to install all relevant packages in a virtual environment
 ```bash
 conda create -n centra-bert --file requirements.txt python=3.6
 conda activate centra-bert
 ```
 
-## Get Started
-
-There are 3 steps to get a multi-task model with CentraBert:
-1. Fine tune
-2. Distill (Optional)
-3. Merge
+## Getting Started
+The proposed framework is based on the idea of partial fine-tuning, i.e. only fine-tune some top layers of BERT while keep the other layers frozen. 
+It features a pipeline that consists of three steps: 
+1. Single-task partial fine-tuning
+2. Single-task knowledge-distillation
+3. Model merging
 
 ![avatar](docs/centra-bert.png)
 
-### Preparation
+In what follows, we demonstrate the functionality that this library offers on two GLUE tasks MRPC and RTE as an example.
 
-Here is an example of fine tuning on the GLUE data set MRPC and RTE.
-
-Before running this example, be sure you have downloaded GLUE data and converted its format.
+### Step 0. Preparation
+Before proceeding, we need to download the task corpora and convert their format. 
+This can be achieved with the following script:
 
 ```bash
 python convert_data_format.py --task=rte --input_dir=data/glue --output_dir=data/glue
+python convert_data_format.py --task=mrpc --input_dir=data/glue --output_dir=data/glue
 ```
 
-You have to create a task config file like `conf/glue_task_config.cfg`
+Next, we need to create a task config file `conf/glue_task_config.cfg` to specify the meta information for each of the tasks, including
+name of the task, type of the task, corpus path, etc.
 ```bash
+[rte_conf]
+task_name = rte
+task_type = classification
+input_file = data/glue/rte/train_json_format.txt,data/glue/rte/dev_json_format.txt,data/glue/rte/test_json_format.txt
+max_seq_length = 128
+output_method = cls
+is_eng = True
+
 [mrpc_conf]
-task_domain = mrpc
+task_name = mrpc
 task_type = classification
 input_file = data/glue/mrpc/train_json_format.txt,data/glue/mrpc/dev_json_format.txt,data/glue/mrpc/test_json_format.txt
 max_seq_length = 128
@@ -41,9 +54,13 @@ output_method = cls
 is_eng = True
 ```
 
-### Fine Tune
+### Step 1. Single-task partial fine-tuning
+In the first step, we partial fine-tune for each task an independent copy of BERT. 
+The exact number of layers `L` to fine-tune may vary across the tasks. 
+We propose to experiment for each task with different value of `L` and select the best one according to some predefined criterion. 
 
-Different tasks may have different optimal fine-tuning layers, so you can use the following script `shell/fine_tuning.sh` to select the best fine-tuning layers.
+The following code snippet (see also `shell/fine_tuning.sh`) trains a number of models for the task of RTE with different hyper-parameters.
+
 ```bash
 #!/usr/bin/env bash
 
@@ -61,8 +78,8 @@ gpu_id=2
 task=rte
 
 # Hyper param, separated by commas
-learning_rate=2e-5,1e-4
-fine_tuning_layers=6,8
+learning_rate=2e-5,5e-5
+fine_tuning_layers=4,5,6,7,8,9,10
 
 # Number of repetitions for each hyper parameter
 exam_num=3
@@ -101,13 +118,18 @@ python result_summary.py \
     --dev=True \
     --version=teacher
 ```
-As you can see, this script will run several training procedures with different hyper-parameter, and the best result will be recorded in `$output_dir/$task/summary.txt`, like:
+When the training is completed, we can find in the log file `model/glue/teacher/rte/summary.txt` the information on model with the best dev result:
 ```bash
 Best metrics: 89.77, best checkpoint: model/glue/teacher/mrpc/Lr-2e-05-Layers-8/ex-3/best_checkpoint/1623838640/model.ckpt-570
 ```
+This is the teacher model that will be compressed in the next step.
 
-### Distill
-After fine tuning, you can use the following script `shell/distill.sh` to distill the teacher model for better performances.
+### Step 2. Single-Task Knowledge Distillation
+In this step, 
+we compress the `L` fine-tuned layers in the teacher model into a smaller `l` layered module. 
+The following snippet (see also `shell/distill.sh`) trains three student models for each `l` in `{1, 2, 3}`.
+The training process is basically the same as in the previous step. The only difference is that we need to specify the path to the teacher model that is going to be distilled.
+
 ```bash
 #!/usr/bin/env bash
 
@@ -129,7 +151,7 @@ task=rte
 
 # Hyper param, separated by commas
 learning_rate=2e-5
-fine_tuning_layers=1,2
+fine_tuning_layers=1,2,3
 
 # Number of repetitions for each hyper parameter
 exam_num=3
@@ -170,10 +192,11 @@ python result_summary.py \
     --keep_layers=$((12-teacher_fine_tuning_layers)) \
     --version=student
 ```
-This process is basically the same as the above fine tuning. The only difference is that you need to specify the teacher model which is going to be distilled.
 
-### Merge
-Now, you can merge all task's branches into one model. Firstly, you have to create a branch config file like `conf/gather_branch.cfg` telling model to load which checkpoint
+### Step 3. Model Merging
+In the final step,  we merge the single task models into one multi-task model. 
+To do this, we need to specify in the config file `conf/branch.cfg` which checkpoint to load,
+ and which are fine-tuned layers for each of the tasks:
 ```bash
 [ckpt_conf]
 mrpc = model/glue/student/mrpc/Lr-2e-05-Layers-4-2/ex-2/best_checkpoint/1623900741/model.ckpt-572
@@ -183,14 +206,14 @@ rte = model/glue/student/rte/Lr-2e-05-Layers-3-2/ex-3/best_checkpoint/1623910751
 mrpc = 5,6
 rte = 4,5
 ```
-Then you can use the following script `shell/merge.sh` to merge all branches.
+Then we run the script `shell/merge.sh` to merge all task branches:
 ```bash
 #!/usr/bin/env bash
 
 # General param
 bert_config_file=conf/uncased_bert_base/bert_config.json
 vocab_file=conf/uncased_bert_base/vocab.txt
-output_dir=model/glue/gather
+output_dir=model/glue/merge
 init_checkpoint=model/uncased_bert_base/bert_model.ckpt
 task_config=conf/glue_task_config.cfg
 branch_config=conf/branch.cfg
@@ -213,21 +236,21 @@ python merge_branch.py \
     --gpu_id=${gpu_id} \
     --input_file=${input_file}
 ```
-The checkpoint in the latest task directory contains trained parameter for all tasks.
+Basically, this script iteratively adds task branches to a frozen backbone model and save checkpoint files at each intermediate step. 
+The checkpoint in the latest task directory (in our example, `model/glue/merge/rte`) contains the final merged multi-task model.
 
-## Advanced
+### Follow-Up: update existing merged MT model
+#### Remove a task branch
 
-### Update Model
-#### Delete a task branch from a merged model.
-
-For example, you have a merged model which contains mrpc, rte, mnli and qnli. You can use the following script to delete a task from this model, such as rte:
+Assume that we have a merged multi-task model containing three task branches: *mrpc*, *rte* and *mnli*. 
+To remove a branch, e.g. rte, we run the following script:
 ```bash
 #!/usr/bin/env bash
 
 # General param
 bert_config_file=conf/uncased_bert_base/bert_config.json
 vocab_file=conf/uncased_bert_base/vocab.txt
-output_dir=model/glue/gather
+output_dir=model/glue/merge
 init_checkpoint=somewhere/merged_model/model.ckpt
 task_config=conf/glue_task_config.cfg
 branch_config=conf/branch.cfg
@@ -235,9 +258,8 @@ gather_from_student=True
 gpu_id=3
 input_file=data/glue/tmp_input_file.txt
 
-# The original task list contains four tasks, now remains three.
-# available_tasks=mrpc,rte,mnli,qnli
-available_tasks=mrpc,mnli,qnli
+# after removing rte, only mrpc and mnli remain
+available_tasks=mrpc,mnli
 
 python update.py \
     --bert_config_file=${bert_config_file} \
@@ -251,17 +273,19 @@ python update.py \
     --gpu_id=${gpu_id} \
     --input_file=${input_file}
 ``` 
+Note that in the code above we did not explicitly specify which task to remove.
+Instead, we have specified in the argument `available_tasks` which tasks to keep. 
 
-#### Add a new task branch into a merged model.
-
-For example, you have a merged model which contains mrpc, rte. You can use the following scripts to add a new task into this model, such as mnli:
+#### Add a new task branch
+Assume that we have a merged multi-task model containing three task branches: mrpc, rte and mnli. 
+The following snippet adds a new task (qnli) to an existing merged multi-task model:
 ```bash
 #!/usr/bin/env bash
 
 # General param
 bert_config_file=conf/uncased_bert_base/bert_config.json
 vocab_file=conf/uncased_bert_base/vocab.txt
-output_dir=model/glue/gather
+output_dir=model/glue/merge
 init_checkpoint=somewhere/merged_model/model.ckpt
 task_config=conf/glue_task_config.cfg
 branch_config=conf/branch.cfg # A new branch config which contains mnli's fine tuning layers
@@ -270,11 +294,11 @@ gpu_id=3
 input_file=data/glue/tmp_input_file.txt
 
 # Current tasks, add the new task mnli
-available_tasks=mrpc,rte,mnli
+available_tasks=mrpc,rte,mnli,qnli
 
 # new task info
-update_checkpoint=somewhere/mnli/model.ckpt
-update_scope=mnli
+update_checkpoint=somewhere/qnli/model.ckpt
+update_scope=qnli
 
 
 python update.py \
@@ -292,16 +316,16 @@ python update.py \
     --input_file=${input_file}
 ```
 
-#### Update an exist task in a merged model.
+#### Update a existing task branch
 
-For example, you have a merged model which contains mrpc, rte. You can use the following scripts to update an exist task branch in this model, such as rte:
+The following snippet updates the task branch for task rte:
 ```bash
 #!/usr/bin/env bash
 
 # General param
 bert_config_file=conf/uncased_bert_base/bert_config.json
 vocab_file=conf/uncased_bert_base/vocab.txt
-output_dir=model/glue/gather
+output_dir=model/glue/merge
 init_checkpoint=somewhere/merged_model/model.ckpt
 task_config=conf/glue_task_config.cfg
 branch_config=conf/branch.cfg # A new branch config if you change rte's fine tuning layers
@@ -333,13 +357,13 @@ python update.py \
 ```
 
 #### How does it work?
-The merged model is generated in the following three steps:
-1. Build the graph which contains a freeze part and several fine-tuned parts according to the `layer_conf` in `branch_config` 
-2. Load parameters from `init_checkpoint` to initialize the original model
-3. Load parameters with specific scope `update_scope` from `update_checkpoint` to initialize the new task branch or reinitialize the exist task branch.
+The merged model is generated as follows:
+1. Build the graph that contains a frozen part and several fine-tuned parts according to the `layer_conf` in `branch.config` 
+2. Load parameters from `init_checkpoint` to initialize the frozen 'backbone' model
+3. Load parameters with specific scope `update_scope` from `update_checkpoint` to initialize the new task branch or reinitialize an existing task branch.
 
-### Result Analysis
-You can use the following scripts to analysis model performance among several training procedures.
+## Result Analysis
+One can use the following scripts to plot the task performance with different hyper-parameter settings:
 ```bash
 output_dir=model/glue/teacher
 task=mrpc

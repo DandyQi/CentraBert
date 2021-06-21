@@ -3,7 +3,7 @@
 # General param
 bert_config_file=conf/uncased_bert_base/bert_config.json
 vocab_file=conf/uncased_bert_base/vocab.txt
-output_dir=model/glue/gather
+output_dir=model/glue/merge
 init_checkpoint=model/uncased_bert_base/bert_model.ckpt
 task_config=conf/glue_task_config.cfg
 branch_config=conf/branch.cfg
