@@ -242,7 +242,7 @@ The checkpoint in the latest task directory (in our example, `model/glue/merge/r
 ### Follow-Up: update existing merged MT model
 #### Remove a task branch
 
-Assume that we have a merged multi-task model containing mrpc, rte, mnli and qnli as task branches. To remove a branch, e.g. rte, we run the following script:
+Assume that we have a merged multi-task model containing mrpc, rte and mnli as task branches. To remove a branch, e.g. rte, we run the following script:
 ```bash
 #!/usr/bin/env bash
 
@@ -257,8 +257,8 @@ gather_from_student=True
 gpu_id=3
 input_file=data/glue/tmp_input_file.txt
 
-# The original task list contains four tasks, now remains three.
-available_tasks=mrpc,mnli,qnli
+# after removing rte, only mrpc and mnli remain
+available_tasks=mrpc,mnli
 
 python update.py \
     --bert_config_file=${bert_config_file} \
@@ -275,7 +275,7 @@ python update.py \
 
 #### Add a new task branch
 
-To add a new task (e.g. mnli) to an existing merged multi-task mode, run the following script:
+The following snippet adds a new task (mnli) to an existing merged multi-task model:
 ```bash
 #!/usr/bin/env bash
 
@@ -315,7 +315,7 @@ python update.py \
 
 #### Update a existing task branch
 
-For example, you have a merged model which contains mrpc, rte. You can use the following scripts to update an exist task branch in this model, such as rte:
+The following snippet updates the task branch for task rte:
 ```bash
 #!/usr/bin/env bash
 
