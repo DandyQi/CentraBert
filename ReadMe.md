@@ -195,7 +195,7 @@ python result_summary.py \
 
 ### Step 3. Model Merging
 In the final step,  we merge the single task models into one multi-task model. 
-To do this, we need to specify in the config file `conf/gather_branch.cfg` which checkpoint to load for each of the tasks
+To do this, we need to specify in the config file `conf/gather_branch.cfg` which checkpoint to load for each of the tasks:
 ```bash
 [ckpt_conf]
 mrpc = model/glue/student/mrpc/Lr-2e-05-Layers-4-2/ex-2/best_checkpoint/1623900741/model.ckpt-572
@@ -205,14 +205,14 @@ rte = model/glue/student/rte/Lr-2e-05-Layers-3-2/ex-3/best_checkpoint/1623910751
 mrpc = 5,6
 rte = 4,5
 ```
-Then by executing the script `shell/merge.sh` to merge all branches.
+Then we run the script `shell/merge.sh` to merge all task branches:
 ```bash
 #!/usr/bin/env bash
 
 # General param
 bert_config_file=conf/uncased_bert_base/bert_config.json
 vocab_file=conf/uncased_bert_base/vocab.txt
-output_dir=model/glue/gather
+output_dir=model/glue/merge
 init_checkpoint=model/uncased_bert_base/bert_model.ckpt
 task_config=conf/glue_task_config.cfg
 branch_config=conf/branch.cfg
@@ -235,11 +235,11 @@ python merge_branch.py \
     --gpu_id=${gpu_id} \
     --input_file=${input_file}
 ```
-The checkpoint in the latest task directory contains trained parameter for all tasks.
+The checkpoint in the latest task directory (in our example, `model/glue/merge/rte`) contains the final merged multi-task model.
 
 ## Advanced
 
-### Update Model
+### Update a model
 #### Delete a task branch from a merged model.
 
 Assume that we have a merged multi-task model containing mrpc, rte, mnli and qnli as task branches. To remove a branch, e.g. rte, we run the following script:
@@ -249,7 +249,7 @@ Assume that we have a merged multi-task model containing mrpc, rte, mnli and qnl
 # General param
 bert_config_file=conf/uncased_bert_base/bert_config.json
 vocab_file=conf/uncased_bert_base/vocab.txt
-output_dir=model/glue/gather
+output_dir=model/glue/merge
 init_checkpoint=somewhere/merged_model/model.ckpt
 task_config=conf/glue_task_config.cfg
 branch_config=conf/branch.cfg
@@ -283,7 +283,7 @@ To add a new task (e.g. mnli) to an existing merged multi-task mode, run the fol
 # General param
 bert_config_file=conf/uncased_bert_base/bert_config.json
 vocab_file=conf/uncased_bert_base/vocab.txt
-output_dir=model/glue/gather
+output_dir=model/glue/merge
 init_checkpoint=somewhere/merged_model/model.ckpt
 task_config=conf/glue_task_config.cfg
 branch_config=conf/branch.cfg # A new branch config which contains mnli's fine tuning layers
@@ -323,7 +323,7 @@ For example, you have a merged model which contains mrpc, rte. You can use the f
 # General param
 bert_config_file=conf/uncased_bert_base/bert_config.json
 vocab_file=conf/uncased_bert_base/vocab.txt
-output_dir=model/glue/gather
+output_dir=model/glue/merge
 init_checkpoint=somewhere/merged_model/model.ckpt
 task_config=conf/glue_task_config.cfg
 branch_config=conf/branch.cfg # A new branch config if you change rte's fine tuning layers
