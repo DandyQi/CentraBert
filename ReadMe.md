@@ -1,12 +1,10 @@
 # CentraBert
 
 We present an efficient BERT-based multi-task (MT) framework that is particularly suitable for iterative and incremental development of the tasks. 
-The proposed framework is based on the idea of partial fine-tuning, i.e. only fine-tune some top layers of BERT while keep the other layers frozen. 
-
 Unlike in conventional Multi-Task Learning where the tasks are coupled due to joint training, 
-in the proposed framework the tasks are independent of each other and can be updated on a regular basis.
+in our framework the tasks are independent of each other and can be updated on a per-task basis.
 One key advantage our framework provides is that the owner of one task do not need to coordinate with other task owners in order to update the model for that task, 
-and any modification made to that task does not interfere with the other tasks.
+and any modification made to that task does not interfere with the rest of the tasks.
 
 ## Installation
 
@@ -16,9 +14,9 @@ conda create -n centra-bert --file requirements.txt python=3.6
 conda activate centra-bert
 ```
 
-## Get Started
-
-The proposed framework features a pipeline that consists of three steps: 
+## Getting Started
+The proposed framework is based on the idea of partial fine-tuning, i.e. only fine-tune some top layers of BERT while keep the other layers frozen. 
+It features a pipeline that consists of three steps: 
 1. Single-task partial fine-tuning
 2. Single-task knowledge-distillation
 3. Model merging
@@ -27,16 +25,16 @@ The proposed framework features a pipeline that consists of three steps:
 
 In what follows, we demonstrate the functionality that this library offers on two GLUE tasks MRPC and RTE as an example.
 
-### Preparation
-Before proceeding, we need to download the task corpora and converted their format. 
-This can be achieved via the following script:
+### Step 0. Preparation
+Before proceeding, we need to download the task corpora and convert their format. 
+This can be achieved with the following script:
 
 ```bash
 python convert_data_format.py --task=rte --input_dir=data/glue --output_dir=data/glue
 python convert_data_format.py --task=mrpc --input_dir=data/glue --output_dir=data/glue
 ```
 
-Next, we need to create a task config file `conf/glue_task_config.cfg` to specify meta information of the task including
+Next, we need to create a task config file `conf/glue_task_config.cfg` to specify the meta information for each of the tasks, including
 name of the task, type of the task, corpus path, etc.
 ```bash
 [rte_conf]
@@ -56,7 +54,7 @@ output_method = cls
 is_eng = True
 ```
 
-### Single-task partial fine-tuning
+### Step 1. Single-task partial fine-tuning
 In the first step, we partial fine-tune for each task an independent copy of BERT. 
 The exact number of layers `L` to fine-tune may vary across the tasks. 
 We propose to experiment for each task with different value of `L` and select the best one according to some predefined criterion. 
@@ -124,13 +122,13 @@ When the training is completed, we can find in the log file `model/glue/teacher/
 ```bash
 Best metrics: 89.77, best checkpoint: model/glue/teacher/mrpc/Lr-2e-05-Layers-8/ex-3/best_checkpoint/1623838640/model.ckpt-570
 ```
-This is the model that will be used as the teacher in the subsequent knowledge distillation step.
+This is the teacher model that will be compressed in the next step.
 
-### Single-Task Knowledge Distillation
+### Step 2. Single-Task Knowledge Distillation
 In this step, 
 we compress the `L` fine-tuned layers in the teacher model into a smaller `l` layered module. 
-The following code snippet (see also `shell/distill.sh`) trains three student models for each `l` in `{1, 2, 3}`.
-The training process is basically the same as in the previous step. The only difference is that we need to specify the teacher model that is going to be distilled.
+The following snippet (see also `shell/distill.sh`) trains three student models for each `l` in `{1, 2, 3}`.
+The training process is basically the same as in the previous step. The only difference is that we need to specify the path to the teacher model that is going to be distilled.
 
 ```bash
 #!/usr/bin/env bash
@@ -195,7 +193,7 @@ python result_summary.py \
     --version=student
 ```
 
-### Model Merging
+### Step 3. Model Merging
 In the final step,  we merge the single task models into one multi-task model. 
 To do this, we need to specify in the config file `conf/gather_branch.cfg` which checkpoint to load for each of the tasks
 ```bash
