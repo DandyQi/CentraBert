@@ -1,7 +1,12 @@
 # CentraBert
 
-CentraBert is an out-of-the-box framework for solving NLU tasks based on BERT.
+We present an efficient BERT-based multi-task (MT) framework that is particularly suitable for iterative and incremental development of the tasks. 
+The proposed framework is based on the idea of partial fine-tuning, i.e. only fine-tune some top layers of BERT while keep the other layers frozen. 
 
+Unlike in conventional Multi-Task Learning where the tasks are coupled due to joint training, 
+in the proposed framework the tasks are independent of each other and can be updated on a regular basis.
+One key advantage our framework provides is that the owner of one task do not need to coordinate with other task owners in order to update the model for that task, 
+and any modification made to that task does not interfere with the other tasks.
 
 ## Installation
 
