@@ -195,7 +195,8 @@ python result_summary.py \
 
 ### Step 3. Model Merging
 In the final step,  we merge the single task models into one multi-task model. 
-To do this, we need to specify in the config file `conf/gather_branch.cfg` which checkpoint to load for each of the tasks:
+To do this, we need to specify in the config file `conf/branch.cfg` which checkpoint to load,
+ and which are fine-tuned layers for each of the tasks:
 ```bash
 [ckpt_conf]
 mrpc = model/glue/student/mrpc/Lr-2e-05-Layers-4-2/ex-2/best_checkpoint/1623900741/model.ckpt-572
@@ -235,12 +236,11 @@ python merge_branch.py \
     --gpu_id=${gpu_id} \
     --input_file=${input_file}
 ```
+Basically, this script iteratively adds task branches to a frozen backbone model and save checkpoint files at each intermediate step. 
 The checkpoint in the latest task directory (in our example, `model/glue/merge/rte`) contains the final merged multi-task model.
 
-## Advanced
-
-### Update a model
-#### Delete a task branch from a merged model.
+### Follow-Up: update existing merged MT model
+#### Remove a task branch
 
 Assume that we have a merged multi-task model containing mrpc, rte, mnli and qnli as task branches. To remove a branch, e.g. rte, we run the following script:
 ```bash
@@ -258,7 +258,6 @@ gpu_id=3
 input_file=data/glue/tmp_input_file.txt
 
 # The original task list contains four tasks, now remains three.
-# available_tasks=mrpc,rte,mnli,qnli
 available_tasks=mrpc,mnli,qnli
 
 python update.py \
@@ -274,7 +273,7 @@ python update.py \
     --input_file=${input_file}
 ``` 
 
-#### Add a new task branch into a merged model.
+#### Add a new task branch
 
 To add a new task (e.g. mnli) to an existing merged multi-task mode, run the following script:
 ```bash
@@ -314,7 +313,7 @@ python update.py \
     --input_file=${input_file}
 ```
 
-#### Update an exist task in a merged model.
+#### Update a existing task branch
 
 For example, you have a merged model which contains mrpc, rte. You can use the following scripts to update an exist task branch in this model, such as rte:
 ```bash
@@ -356,12 +355,12 @@ python update.py \
 
 #### How does it work?
 The merged model is generated as follows:
-1. Build the graph that contains a frozen part and several fine-tuned parts according to the `layer_conf` in `branch_config` 
-2. Load parameters from `init_checkpoint` to initialize the original model
-3. Load parameters with specific scope `update_scope` from `update_checkpoint` to initialize the new task branch or reinitialize the exist task branch.
+1. Build the graph that contains a frozen part and several fine-tuned parts according to the `layer_conf` in `branch.config` 
+2. Load parameters from `init_checkpoint` to initialize the frozen 'backbone' model
+3. Load parameters with specific scope `update_scope` from `update_checkpoint` to initialize the new task branch or reinitialize an existing task branch.
 
-### Result Analysis
-You can use the following scripts to analysis model performance among several training procedures.
+## Result Analysis
+One can use the following scripts to plot the task performance with different hyper-parameter settings:
 ```bash
 output_dir=model/glue/teacher
 task=mrpc
